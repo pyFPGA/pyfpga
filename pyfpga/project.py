@@ -78,7 +78,7 @@ class Project:
             raise NotADirectoryError(path)
         self.data.setdefault('includes', []).append(path.as_posix())
 
-    def _add_file(self, pathname, hdl=None, lib=None):
+    def _add_file(self, pathname, hdl=None, lib=None, options=None):
         files = glob.glob(pathname, recursive=True)
         if len(files) == 0:
             raise FileNotFoundError(pathname)
@@ -89,48 +89,65 @@ class Project:
                 attr['hdl'] = hdl
             if lib:
                 attr['lib'] = lib
+            if options:
+                attr['opt'] = options
             if path in self.data.get('files', {}):
                 del self.data['files'][path]
             self.data.setdefault('files', {})[path] = attr
 
-    def add_slog(self, pathname):
+    def add_slog(self, pathname, options=None):
         """Add System Verilog file/s.
 
         :param pathname: path to a SV file (glob compliant)
         :type pathname: str
+        :param options: extra options for the underlying command
+        :type options: str, optional
         :raises FileNotFoundError: when pathname is not found
         """
-        self.logger.debug('Executing add_slog: %s', pathname)
-        self._add_file(pathname, 'slog')
+        self.logger.debug('Executing add_slog:')
+        self.logger.debug('* pathname = %s', pathname)
+        self.logger.debug('* options = %s', options)
+        self._add_file(pathname, 'slog', options)
 
-    def add_vhdl(self, pathname, lib=None):
+    def add_vhdl(self, pathname, lib=None, options=None):
         """Add VHDL file/s.
 
         :param pathname: path to a SV file (glob compliant)
         :type pathname: str
         :param lib: VHDL library name
         :type lib: str, optional
+        :param options: extra options for the underlying command
+        :type options: str, optional
         :raises FileNotFoundError: when pathname is not found
         """
+        self.logger.debug('Executing add_vhdl:')
+        self.logger.debug('* pathname = %s', pathname)
         lib_str = 'default library' if lib is None else lib
-        self.logger.debug('Executing add_vhdl: %s : %s', lib_str, pathname)
-        self._add_file(pathname, 'vhdl', lib)
+        self.logger.debug('* lib = %s', lib_str)
+        self.logger.debug('* options = %s', options)
+        self._add_file(pathname, 'vhdl', lib, options)
 
-    def add_vlog(self, pathname):
+    def add_vlog(self, pathname, options=None):
         """Add Verilog file/s.
 
         :param pathname: path to a SV file (glob compliant)
         :type pathname: str
+        :param options: extra options for the underlying command
+        :type options: str, optional
         :raises FileNotFoundError: when pathname is not found
         """
-        self.logger.debug('Executing add_vlog: %s', pathname)
-        self._add_file(pathname, 'vlog')
+        self.logger.debug('Executing add_vlog:')
+        self.logger.debug('* pathname = %s', pathname)
+        self.logger.debug('* options = %s', options)
+        self._add_file(pathname, 'vlog', options)
 
-    def add_cons(self, path):
+    def add_cons(self, path, options=None):
         """Add a constraint file.
 
-        :param pathname: path of a file
+        :param pathname: path to a constraint file
         :type pathname: str
+        :param options: extra options for the underlying command
+        :type options: str, optional
         :raises FileNotFoundError: if path is not found
         """
         self.logger.debug('Executing add_cons: %s', path)
@@ -138,6 +155,8 @@ class Project:
         if not path.is_file():
             raise FileNotFoundError(path)
         attr = {}
+        if options:
+            attr['opt'] = options
         self.data.setdefault('constraints', {})[path.as_posix()] = attr
 
     def add_param(self, name, value):
@@ -148,7 +167,9 @@ class Project:
         :param value: parameter/generic value
         :type name: str
         """
-        self.logger.debug('Executing add_param: %s : %s', name, value)
+        self.logger.debug('Executing add_param:')
+        self.logger.debug('* name = %s', name)
+        self.logger.debug('* value = %s', value)
         self.data.setdefault('params', {})[name] = value
 
     def add_define(self, name, value):
@@ -159,7 +180,9 @@ class Project:
         :param value: define value
         :type name: str
         """
-        self.logger.debug('Executing add_define: %s : %s', name, value)
+        self.logger.debug('Executing add_define:')
+        self.logger.debug('* name = %s', name)
+        self.logger.debug('* value = %s', value)
         self.data.setdefault('defines', {})[name] = value
 
     def add_fileset(self, pathname):
@@ -194,7 +217,9 @@ class Project:
         :type hook: str
         :raises ValueError: when stage is invalid
         """
-        self.logger.debug('Executing add_hook: %s : %s', stage, hook)
+        self.logger.debug('Executing add_hook:')
+        self.logger.debug('* stage = %s', stage)
+        self.logger.debug('* hook = %s', hook)
         stages = [
             'precfg', 'postcfg', 'presyn', 'postsyn',
             'prepar', 'postpar', 'prebit', 'postbit'
@@ -202,6 +227,25 @@ class Project:
         if stage not in stages:
             raise ValueError('Invalid stage.')
         self.data.setdefault('hooks', {}).setdefault(stage, []).append(hook)
+
+    def set_options(self, command, options):
+        """Set extra options for the specified underlying command.
+
+        :param command: command where to apply the options
+        :type command: str
+        :param options: extra options for the underlying command
+        :type options: str
+        :raises ValueError: when command is invalid
+        """
+        self.logger.debug('Executing set_options:')
+        self.logger.debug('* command = %s', command)
+        self.logger.debug('* options = %s', options)
+        commands = ['prj', 'syn', 'par', 'bit']
+        if command not in commands:
+            raise ValueError('Invalid command.')
+        self.data.setdefault('options', {}).setdefault(command, []).append(
+            options
+        )
 
     def set_debug(self):
         """Enables debug messages."""
@@ -219,7 +263,9 @@ class Project:
 
         .. note:: valid steps are ``cfg``, ``syn``, ``par`` and ``bit``.
         """
-        self.logger.debug('Executing make')
+        self.logger.debug('Executing make:')
+        self.logger.debug('* first = %s', first)
+        self.logger.debug('* last = %s', last)
         if last not in STEPS:
             raise ValueError('Invalid last step.')
         if first not in STEPS:
@@ -247,7 +293,9 @@ class Project:
         :raises ValueError: for missing or wrong values
         :raises RuntimeError: error running the needed underlying tool
         """
-        self.logger.debug('Executing prog')
+        self.logger.debug('Executing prog:')
+        self.logger.debug('* bitstream = %s', bitstream)
+        self.logger.debug('* position = %s', position)
         if position not in range(1, 9):
             raise ValueError('Invalid position.')
         self.logger.info('Programming')

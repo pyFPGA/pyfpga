@@ -32,7 +32,7 @@ class Ise(Project):
         self.data['speed'] = info['speed']
         self.data['package'] = info['package']
 
-    def add_slog(self, pathname):
+    def add_slog(self, pathname, options=None):
         """Add System Verilog file/s."""
         raise NotImplementedError('ISE does not support SystemVerilog')
 
