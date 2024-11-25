@@ -5,28 +5,29 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        os: ['ubuntu', 'windows']
+        pyver: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        exclude:
+          - os: 'windows'
+            pyver: '3.8'
+          - os: 'windows'
+            pyver: '3.9'
+          - os: 'windows'
+            pyver: '3.10'
+          - os: 'windows'
+            pyver: '3.11'
+    runs-on: ${{ matrix.os }}-latest
+    name: ${{ matrix.os }} | ${{ matrix.pyver }}
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.pyver }}
+      uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: ${{ matrix.pyver }}
     - name: Install dependencies
-      run: |
-        pip install pytest
-        pip install .
-    - name: Pull container images
-      run: |
-        docker pull hdlc/prjtrellis
-        docker pull hdlc/ghdl:yosys
-        docker pull hdlc/icestorm
-        docker pull hdlc/nextpnr:ecp5
-        docker pull hdlc/nextpnr:ice40
-    - name: Test
-      run: |
-        pytest
-        make -C examples
+      run: pip install . && pip install pytest
+    - name: Run tests
+      run: make test

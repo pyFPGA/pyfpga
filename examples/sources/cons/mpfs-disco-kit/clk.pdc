@@ -1,0 +1,1 @@
+set_io -port_name clk_i -DIRECTION INPUT -pin_name R18 -fixed true

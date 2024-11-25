@@ -1,0 +1,1 @@
+set_io -port_name led_o -DIRECTION OUTPUT -pin_name T18 -fixed true

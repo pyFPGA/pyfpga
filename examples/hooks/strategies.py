@@ -105,7 +105,4 @@ for tool in commands:
             'project'
         )
         PRJ.add_hook(commands[tool][strategy], 'project')
-        try:
-            PRJ.generate(to_task='syn')
-        except RuntimeError:
-            print('ERROR:generate:{} not found'.format(tool))
+        PRJ.generate(to_task='syn')

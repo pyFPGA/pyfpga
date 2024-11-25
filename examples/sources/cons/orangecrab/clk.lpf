@@ -1,0 +1,2 @@
+LOCATE COMP "clk_i" SITE "A9";
+IOBUF PORT "clk_i" IO_TYPE=LVCMOS33;

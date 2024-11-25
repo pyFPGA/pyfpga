@@ -1,4 +1,0 @@
-# Physical Design Constraints
-
-set_io clk_i -DIRECTION INPUT -pinname 23 -fixed yes
-set_io led_o -DIRECTION OUTPUT -pinname 117 -fixed yes

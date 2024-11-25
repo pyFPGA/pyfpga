@@ -1,5 +1,0 @@
-input: doc
-output: _build
-target: gh-pages
-formats: [ html ]
-theme: https://codeload.github.com/buildthedocs/sphinx.theme/tar.gz/v0

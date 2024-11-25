@@ -1,6 +1,5 @@
 *build
 ignore*
+results
 venv
 __pycache__
-*.egg-info
-_theme

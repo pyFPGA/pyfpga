@@ -1,0 +1,1 @@
+set_io clk_i -DIRECTION INPUT -pinname 23 -fixed yes

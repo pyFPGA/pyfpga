@@ -1,0 +1,15 @@
+{#
+#
+# Copyright (C) 2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+file delete -force -- libero-prog
+new_project -name libero -location libero-prog -mode single
+
+set_programming_file -file {{ bitstream }}
+set_programming_action -action {PROGRAM}
+
+run_selected_actions

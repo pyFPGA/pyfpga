@@ -1,0 +1,126 @@
+{#
+#
+# Copyright (C) 2020-2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+set -e
+
+DOCKER="docker run --user $(id -u):$(id -g) --rm -v $HOME:$HOME -w $PWD"
+
+{% if 'syn' in steps %}# Synthesis
+$DOCKER hdlc/ghdl:yosys /bin/bash -c "
+{% if hooks %}{{ hooks.presyn | join('\n') }}{% endif %}
+
+{% set gflags = '--std=08 -fsynopsys -fexplicit -frelaxed' %}
+{% if files %}# VHDL Files inclusion
+{% for name, attr in files.items() %}
+{% if attr.hdl == "vhdl" %}
+ghdl -a {{ gflags }}{% if 'lib' in attr %} --work={{ attr.lib }}{% endif %} {{ name }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+yosys -Q -m ghdl -p '
+
+{% if includes %}# Verilog Includes
+verilog_defaults -add{% for path in includes %} -I{{ path }}{% endfor %}
+{% endif %}
+
+{% if defines %}# Verilog Defines
+verilog_defines{% for key, value in defines.items() %} -D{{ key }}={{ value }}{% endfor %}
+{% endif %}
+
+{% if files %}# VLOG Files inclusion
+{% for name, attr in files.items() %}
+{% if attr.hdl == "vlog" %}
+read_verilog -defer {{ name }}
+{% elif attr.hdl == "slog" %}
+read_verilog -defer -sv {{ name }}
+{% elif attr.hdl == "vhdl" %}
+{% if loop.first %}
+{% if params %}# VHDL Generics
+ghdl {{ gflags }}{% for key, value in params.items() %} -g{{ key }}={{ value }}{% endfor %} {{ top }}
+{% else %}
+ghdl {{ gflags }} {{ top }}
+{% endif %}
+{% endif %}
+{% endif %}
+{% if loop.last and attr.hdl in ["vlog", "slog"] and params %}# Verilog Parameters
+chparam{% for key, value in params.items() %} -set {{ key }} {{ value }}{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+# Top-level specification and Syntesis
+{% if family in ['ice40', 'ecp5'] %}
+synth_{{ family }} -top {{ top }} -json {{ project }}.json
+{% elif family in ['xc6s', 'xc6v', 'xc5v', 'xc4v', 'xc3sda', 'xc3sa', 'xc3se', 'xc3s', 'xc2vp', 'xc2v', 'xcve', 'xcv'] %}
+synth_xilinx -top {{ top }} -family {{ family }}
+write_edif -pvector bra {{ project }}.edif -ise
+{% elif family %}
+synth_xilinx -top {{ top }} -family {{ family }}
+write_edif -pvector bra {{ project }}.edif
+{% else %}
+synth -top {{ top }}
+write_verilog {{ project }}.v
+{% endif %}
+'
+{% if hooks %}{{ hooks.postsyn | join('\n') }}{% endif %}
+"
+{% endif %}
+
+{% if 'par' in steps %}# Place and Route
+
+CONSTRAINTS="{{ constraints | join(' ') }}"
+
+{% if family == 'ice40' %}
+{% if constraints %}
+cat $CONSTRAINTS > {{ project }}.pcf
+CONSTRAINT="--pcf {{ project }}.pcf"
+{% endif %}
+$DOCKER hdlc/nextpnr:ice40 /bin/bash -c "
+{% if hooks %}{{ hooks.prepar | join('\n') }}{% endif %}
+nextpnr-ice40 --{{ device }} --package {{ package }} $CONSTRAINT --json {{ project }}.json --asc {{ project }}.asc
+{% if hooks %}{{ hooks.postpar | join('\n') }}{% endif %}
+"
+$DOCKER hdlc/icestorm /bin/bash -c "
+icetime -d {{ device }} -mtr {{ project }}.rpt {{ project }}.asc
+"
+{% endif %}
+
+{% if family == 'ecp5' %}
+{% if constraints %}
+cat $CONSTRAINTS > {{ project }}.lpf
+CONSTRAINT="--lpf {{ project }}.lpf"
+{% endif %}
+$DOCKER hdlc/nextpnr:ecp5 /bin/bash -c "
+{% if hooks %}{{ hooks.prepar | join('\n') }}{% endif %}
+nextpnr-ecp5 --{{ device }} --package {{ package }} $CONSTRAINT --json {{ project }}.json --textcfg {{ project }}.config
+{% if hooks %}{{ hooks.postpar | join('\n') }}{% endif %}
+"
+{% endif %}
+
+{% endif %}
+
+{% if 'bit' in steps %}# Bitstream generation
+
+{% if family == 'ice40' %}
+$DOCKER hdlc/icestorm /bin/bash -c "
+{% if hooks %}{{ hooks.prebit | join('\n') }}{% endif %}
+icepack {{ project }}.asc {{ project }}.bit
+{% if hooks %}{{ hooks.postbit | join('\n') }}{% endif %}
+"
+{% endif %}
+
+{% if family == 'ecp5' %}
+$DOCKER hdlc/prjtrellis /bin/bash -c "
+{% if hooks %}{{ prebit | join('\n') }}{% endif %}
+ecppack --svf {{ project }}.svf {{ project }}.config {{ project }}.bit
+{% if hooks %}{{ postbit | join('\n') }}{% endif %}
+"
+{% endif %}
+
+{% endif %}

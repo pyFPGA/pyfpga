@@ -1,0 +1,28 @@
+digraph openflow {
+  graph [ranksep=0.25];
+  node [shape = doublecircle];
+  node [shape = rectangle];
+  GHDL "ghdl-yosys-plugin" Yosys "nextpnr-ice40" "nextpnr-ecp5" icetime icepack iceprog eccpack;
+  node [shape = note ];
+  VHDL Verilog;
+  node [shape = box3d ];
+  ice40;
+  node [shape = oval];
+  "bit-ice40" [label=".bit"];
+  "bit-ecp5"  [label=".bit"];
+  VHDL                -> {GHDL "ghdl-yosys-plugin"};
+  GHDL                -> "ghdl-yosys-plugin";
+  "ghdl-yosys-plugin" -> Yosys;
+  Verilog             -> Yosys;
+  Yosys               -> ".json";
+  ".json"             -> {"nextpnr-ice40" "nextpnr-ecp5"};
+  "nextpnr-ice40"     -> ".asc";
+  "nextpnr-ecp5"      -> ".config";
+  ".asc"              -> {icetime icepack};
+  icepack             -> "bit-ice40";
+  "bit-ice40"         -> iceprog;
+  iceprog             -> ice40;
+  ".config"           -> eccpack;
+  eccpack             -> "bit-ecp5";
+  {rank = same; GHDL ; "ghdl-yosys-plugin"; Yosys;}
+}

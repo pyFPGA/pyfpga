@@ -1,0 +1,102 @@
+{#
+#
+# Copyright (C) 2015-2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+{% if 'cfg' in steps %}# Project configuration -------------------------------------------------------
+
+create_project -force {{ project }}
+set_property SOURCE_MGMT_MODE None [current_project]
+set_property STEPS.SYNTH_DESIGN.ARGS.ASSERT true [get_runs synth_1]
+set_property PART {{ part }} [current_project]
+
+{% if hooks %}{{ hooks.precfg | join('\n') }}{% endif %}
+
+{% if files %}# Files inclusion
+{% for name, attr in files.items() %}
+add_file {{ name }}
+{% if 'lib' in attr %}set_property library {{ attr.lib }} [get_files {{ name }}]{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if constraints %}# Constraints inclusion
+{% for name, attr in constraints.items() %}
+add_file -fileset constrs_1 {{ name }}
+{% if loop.first %}set_property TARGET_CONSTRS_FILE {{ name }} [current_fileset -constrset]{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if top %}# Top-level specification
+set_property TOP {{ top }} [current_fileset]
+{% endif %}
+
+{% if includes %}# Verilog Includes
+set_property INCLUDE_DIRS { {{ includes | join(' ') }} } [current_fileset]
+{% endif %}
+
+{% if defines %}# Verilog Defines
+set_property VERILOG_DEFINE { {{ defines.items() | map('join', '=') | join(' ') }} } [current_fileset]
+{% endif %}
+
+{% if params %}# Verilog Parameters / VHDL Generics
+set_property GENERIC { {{ params.items() | map('join', '=') | join(' ') }} } -objects [get_filesets sources_1]
+{% endif %}
+
+{% if hooks %}{{ hooks.postcfg | join('\n') }}{% endif %}
+
+close_project
+
+{% endif %}
+
+{% if 'syn' in steps or 'par' in steps or 'bit' in steps %}# Design flow -----------------------------------------------------------------
+
+open_project {{ project }}
+
+{% if 'syn' in steps %}# Synthesis
+
+{% if hooks %}{{ hooks.presyn | join('\n') }}{% endif %}
+
+# PRESYNTH
+# set_property DESIGN_MODE GateLvl [current_fileset]
+reset_run synth_1
+launch_runs synth_1
+wait_on_run synth_1
+#report_property [get_runs synth_1]
+if { [get_property STATUS [get_runs synth_1]] ne "synth_design Complete!" } { exit 1 }
+
+{% if hooks %}{{ hooks.postsyn | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'par' in steps %}# Place and Route
+
+{% if hooks %}{{ hooks.prepar | join('\n') }}{% endif %}
+
+reset_run impl_1
+launch_runs impl_1
+wait_on_run impl_1
+#report_property [get_runs impl_1]
+if { [get_property STATUS [get_runs impl_1]] ne "route_design Complete!" } { exit 1 }
+
+{% if hooks %}{{ hooks.postpar | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'bit' in steps %}# Bitstream generation
+
+{% if hooks %}{{ hooks.prebit | join('\n') }}{% endif %}
+
+open_run impl_1
+write_bitstream -force {{ project }}
+write_debug_probes -force -quiet {{ project }}.ltx
+
+{% if hooks %}{{ hooks.postbit | join('\n') }}{% endif %}
+
+{% endif %}
+
+close_project
+
+{% endif %}

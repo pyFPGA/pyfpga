@@ -1,0 +1,1 @@
+set_io led_o -DIRECTION OUTPUT -pinname 117 -fixed yes

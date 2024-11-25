@@ -1,0 +1,26 @@
+name: 'docs'
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'pyfpga/project.py'
+    branches:
+      - main
+      - dev
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Install dependencies
+      run: pip install . && pip install sphinx sphinx-rtd-theme
+    - name: Build documentation
+      run: make docs
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/build/html

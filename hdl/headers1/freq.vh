@@ -1,1 +1,0 @@
-`define DEFAULT_FREQ 25000000

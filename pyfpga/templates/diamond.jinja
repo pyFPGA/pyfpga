@@ -1,0 +1,105 @@
+{#
+#
+# Copyright (C) 2015-2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+{% if 'cfg' in steps %}# Project configuration -------------------------------------------------------
+
+prj_project new -name {{ project }} -dev {{ part }}
+
+# For now, let's enforce Synplify as LSE (the default) has broken top level generic handling
+prj_syn set synplify
+
+{% if hooks %}{{ hooks.precfg | join('\n') }}{% endif %}
+
+{% if files %}# Files inclusion
+{% for name, attr in files.items() %}
+prj_src add {% if 'lib' in attr %}-work {{ attr.lib }}{% else %}{% endif %} {{ name }}
+{% endfor %}
+{% endif %}
+
+{% if constraints %}
+# Constraints inclusion
+#   Diamond only supports one constraints file, so we need to combine them into the default diamond.lpf.
+#   We can't just do `prj_src add <constraints-file>` multiple times.
+set fileId [open {{ project }}.lpf "w"]
+{% for name, attr in constraints.items() %}
+set fp [open "{{ name }}" r]
+set file_data [read $fp]
+close $fp
+puts -nonewline $fileId $file_data
+{% endfor %}
+close $fileId
+{% endif %}
+
+{% if top %}# Top-level specification
+prj_impl option top "{{ top }}"
+{% endif %}
+
+{% if includes %}# Verilog Includes
+{% for include in includes %}
+prj_impl option -append {include path} {{ "{"+include+"}" }}
+{% endfor %}
+{% endif %}
+
+{% if defines %}# Verilog Defines
+{% for key, value in defines.items() %}
+prj_impl option -append VERILOG_DIRECTIVES {{ key }}={{ value }}
+{% endfor %}
+{% endif %}
+
+{% if params %}# Verilog Parameters / VHDL Generics
+{% for key, value in params.items() %}
+prj_impl option -append HDL_PARAM {{ key }}={{ value }}
+{% endfor %}
+{% endif %}
+
+{% if hooks %}{{ hooks.postcfg | join('\n') }}{% endif %}
+
+prj_project save
+prj_project close
+
+{% endif %}
+
+{% if 'syn' in steps or 'par' in steps or 'bit' in steps %}# Design flow -----------------------------------------------------------------
+
+prj_project open {{ project }}.ldf
+
+{% if 'syn' in steps %}# Synthesis
+
+{% if hooks %}{{ hooks.presyn | join('\n') }}{% endif %}
+
+prj_run Synthesis -forceOne
+
+{% if hooks %}{{ hooks.postsyn | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'par' in steps %} # Translate, Map, and Place and Route
+{% if hooks %}{{ hooks.prepar | join('\n') }}{% endif %}
+
+prj_run Translate -forceOne
+prj_run Map -forceOne
+prj_run PAR -forceOne
+
+{% if hooks %}{{ hooks.postpar | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'bit' in steps %}# Bitstream generation
+
+{% if hooks %}{{ hooks.prebit | join('\n') }}{% endif %}
+
+prj_run Export -task Bitgen -forceOne
+
+{% if hooks %}{{ hooks.postbit | join('\n') }}{% endif %}
+
+{% endif %}
+
+prj_project save
+prj_project close
+
+{% endif %}

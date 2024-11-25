@@ -1,0 +1,19 @@
+{#
+# Copyright (C) 2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+if [ "$DIAMOND_XCF" == "" ]; then
+	DIAMOND_XCF=impl1/impl1.xcf
+fi
+
+if [ -f "$DIAMOND_XCF" ]; then
+	pgrcmd -infile $DIAMOND_XCF
+else
+	echo "ERROR: Automatic programming with Diamond is not yet supported."
+	echo "       Please create the `realpath $DIAMOND_XCF` file manually and rerun the prog command."
+	echo "       Hint: You can change the location of the XCF file by setting the DIAMOND_XCF environment variable."
+	exit 1
+fi

@@ -1,0 +1,106 @@
+{#
+#
+# Copyright (C) 2015-2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+{% if 'cfg' in steps %}# Project configuration -------------------------------------------------------
+
+package require ::quartus::project
+project_new {{ project }} -overwrite
+set_global_assignment -name DEVICE {{ part }}
+
+{% if hooks %}{{ hooks.precfg | join('\n') }}{% endif %}
+
+{% if files %}# Files inclusion
+{% for name, attr in files.items() %}
+{% if attr.hdl == "vhdl" %}
+set_global_assignment -name VHDL_FILE {{ name }} {% if 'lib' in attr %} -library {{ attr.lib }}{% endif %}
+{% elif attr.hdl == "vlog" %}
+set_global_assignment -name VERILOG_FILE {{ name }}
+{% elif attr.hdl == "slog" %}
+set_global_assignment -name SYSTEMVERILOG_FILE {{ name }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if constraints %}# Constraints inclusion
+{% for name, attr in constraints.items() %}
+{% if name.endswith('.sdc') %}
+set_global_assignment -name SDC_FILE {{ name }}
+{% else %}
+source {{ name }}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if top %}# Top-level specification
+set_global_assignment -name TOP_LEVEL_ENTITY {{ top }}
+{% endif %}
+
+{% if includes %}# Verilog Includes
+{% for include in includes %}
+set_global_assignment -name SEARCH_PATH {{ include }}
+{% endfor %}
+{% endif %}
+
+{% if defines %}# Verilog Defines
+{% for key, value in defines.items() %}
+set_global_assignment -name VERILOG_MACRO {{ key }}={{ value }}
+{% endfor %}
+{% endif %}
+
+{% if params %}# Verilog Parameters / VHDL Generics
+{% for key, value in params.items() %}
+set_parameter -name {{ key }} {{ value }}
+{% endfor %}
+{% endif %}
+
+{% if hooks %}{{ hooks.postcfg | join('\n') }}{% endif %}
+
+project_close
+
+{% endif %}
+
+{% if 'syn' in steps or 'par' in steps or 'bit' in steps %}# Design flow -----------------------------------------------------------------
+
+package require ::quartus::flow
+project_open -force {{ project }}.qpf
+# set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
+
+{% if 'syn' in steps %}# Synthesis
+
+{% if hooks %}{{ hooks.presyn | join('\n') }}{% endif %}
+
+execute_module -tool map
+
+{% if hooks %}{{ hooks.postsyn | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'par' in steps %}# Place and Route
+
+{% if hooks %}{{ hooks.prepar | join('\n') }}{% endif %}
+
+execute_module -tool fit
+execute_module -tool sta
+
+{% if hooks %}{{ hooks.postpar | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'bit' in steps %}# Bitstream generation
+
+{% if hooks %}{{ hooks.prebit | join('\n') }}{% endif %}
+
+execute_module -tool asm
+
+{% if hooks %}{{ hooks.postbit | join('\n') }}{% endif %}
+
+{% endif %}
+
+project_close
+
+{% endif %}

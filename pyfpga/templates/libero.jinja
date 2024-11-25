@@ -1,0 +1,124 @@
+{#
+#
+# Copyright (C) 2015-2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+{% if 'cfg' in steps %}# Project configuration -------------------------------------------------------
+
+if { [ file exists {{ project }} ] } { file delete -force -- {{ project }} }
+new_project -name {{ project }} -location libero -hdl VERILOG -family {{ family }}
+set_device -family {{ family }} -die {{ device }} -package {{ package}} -speed {{ speed }} -part_range {{ prange }}
+
+{% if hooks %}{{ hooks.precfg | join('\n') }}{% endif %}
+
+{% if includes %}# Verilog Includes
+set_global_include_path_order -paths "{{ includes | join(' ') }}"
+{% endif %}
+
+{% if files %}# Files inclusion
+{% for name, attr in files.items() %}
+create_links -hdl_source {{ name }}{% if 'lib' in attr %} -library {{ attr.lib }}{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if constraints %}# Constraints inclusion
+{% for name, attr in constraints.items() %}
+create_links {% if name.endswith('.sdc') %}-sdc{% else %}-io_pdc{% endif %} {{ name }}
+{% endfor %}
+{% endif %}
+
+build_design_hierarchy
+
+{% if top %}# Top-level specification
+set_root {{ top }}
+{% endif %}
+
+{% if constraints %}# Constraints configuration
+{% set sdc_files = [] %}
+{% set pdc_files = [] %}
+{% for name, attr in constraints.items() %}
+{% if name.endswith('.sdc') %}
+{% set _ = sdc_files.append(name) %}
+{% endif %}
+{% set _ = pdc_files.append(name) %}
+{% endfor %}
+{% endif %}
+
+{% if sdc_files %}organize_tool_files -tool {SYNTHESIZE}   -file {{ sdc_files | join(' -file ') }} -module {{ top }} -input_type {constraint}{% endif %}
+{% if pdc_files %}organize_tool_files -tool {PLACEROUTE}   -file {{ pdc_files | join(' -file ') }} -module {{ top }} -input_type {constraint}{% endif %}
+{% if sdc_files %}organize_tool_files -tool {VERIFYTIMING} -file {{ sdc_files | join(' -file ') }} -module {{ top }} -input_type {constraint}{% endif %}
+
+{% if includes or defines or params %}# Synopsys configuration
+configure_tool -name {SYNTHESIZE} -params {SYNPLIFY_OPTIONS:
+
+{% if includes %}# Verilog Includes (Synopsys)
+{% for include in includes %}
+  set_option -include_path "{{ include }}"
+{% endfor %}
+{% endif %}
+
+{% if defines %}# Verilog Defines (Synopsys)
+{% for key, value in defines.items() %}
+  set_option -hdl_define -set {{ key }}={{ value }}
+{% endfor %}
+{% endif %}
+
+{% if params %}# Verilog Parameters / VHDL Generics (Synopsys)
+{% for key, value in params.items() %}
+  set_option -hdl_param -set {{ key }}={{ value }}
+{% endfor %}
+{% endif %}
+
+}
+{% endif %}
+
+{% if hooks %}{{ hooks.postcfg | join('\n') }}{% endif %}
+
+close_project
+
+{% endif %}
+
+{% if 'syn' in steps or 'par' in steps or 'bit' in steps %}# Design flow -----------------------------------------------------------------
+
+if { [catch {open_project {{ project }}/{{ project }}.prjx} ] } {
+  open_project {{ project }}.prjx
+}
+
+{% if 'syn' in steps %}# Synthesis
+
+{% if hooks %}{{ hooks.presyn | join('\n') }}{% endif %}
+
+run_tool -name {SYNTHESIZE}
+
+{% if hooks %}{{ hooks.postsyn | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'par' in steps %}# Place and Route
+
+{% if hooks %}{{ hooks.prepar | join('\n') }}{% endif %}
+
+run_tool -name {PLACEROUTE}
+run_tool -name {VERIFYTIMING}
+
+{% if hooks %}{{ hooks.postpar | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'bit' in steps %}# Bitstream generation
+
+{% if hooks %}{{ hooks.prebit | join('\n') }}{% endif %}
+
+run_tool -name {GENERATEPROGRAMMINGFILE}
+catch { file copy -force {{ project }}/designer/{{ top }}/{{ top }}.ppd {{ project }}.ppd }
+
+{% if hooks %}{{ hooks.postbit | join('\n') }}{% endif %}
+
+{% endif %}
+
+close_project
+
+{% endif %}

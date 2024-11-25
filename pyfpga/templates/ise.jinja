@@ -1,0 +1,105 @@
+{#
+#
+# Copyright (C) 2015-2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+{% if 'cfg' in steps %}# Project configuration -------------------------------------------------------
+
+if { [ file exists {{ project }}.xise ] } { file delete {{ project }}.xise }
+project new {{ project }}.xise
+project set family  {{ family }}
+project set device  {{ device }}
+project set package {{ package }}
+project set speed   {{ speed }}
+
+{% if hooks %}{{ hooks.precfg | join('\n') }}{% endif %}
+
+{% if files %}# Files inclusion
+{% for name, attr in files.items() %}
+{% if 'lib' in attr %}lib_vhdl new {{ attr.lib }}{% endif %}
+xfile add {{ name }}{% if 'lib' in attr %} -lib_vhdl {{ attr.lib }}{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if constraints %}# Constraints inclusion
+{% for name, attr in constraints.items() %}
+xfile add {{ name }}
+{% if name.endswith('.xcf') %}
+project set "Synthesis Constraints File" "{{ name }}" -process "Synthesize - XST"
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if top %}# Top-level specification
+project set top {{ top }}
+{% endif %}
+
+{% if includes %}# Verilog Includes
+project set "Verilog Include Directories" "{{ includes | join('|') }}" -process "Synthesize - XST"
+{% endif %}
+
+{% if defines %}# Verilog Defines
+project set "Verilog Macros" "{{ defines.items() | map('join', '=') | join(' | ') }}" -process "Synthesize - XST"
+{% endif %}
+
+{% if params %}# Verilog Parameters / VHDL Generics
+project set "Generics, Parameters" "{{ params.items() | map('join', '=') | join(' ') }}" -process "Synthesize - XST"
+{% endif %}
+
+{% if hooks %}{{ hooks.postcfg | join('\n') }}{% endif %}
+
+project close
+
+{% endif %}
+
+{% if 'syn' in steps or 'par' in steps or 'bit' in steps %}# Design flow -----------------------------------------------------------------
+
+project open {{ project }}.xise
+
+{% if 'syn' in steps %}# Synthesis
+
+{% if hooks %}{{ hooks.presyn | join('\n') }}{% endif %}
+
+# PRESYNTH
+#project set top_level_module_type "EDIF"
+project clean
+process run "Synthesize"
+if { [process get "Synthesize" status] == "errors" } { exit 1 }
+
+{% if hooks %}{{ hooks.postsyn | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'par' in steps %}# Place and Route
+
+{% if hooks %}{{ hooks.prepar | join('\n') }}{% endif %}
+
+process run "Translate"
+if { [process get "Translate" status] == "errors" } { exit 1 }
+process run "Map"
+if { [process get "Map" status] == "errors" } { exit 1 }
+process run "Place & Route"
+if { [process get "Place & Route" status] == "errors" } { exit 1 }
+
+{% if hooks %}{{ hooks.postpar | join('\n') }}{% endif %}
+
+{% endif %}
+
+{% if 'bit' in steps %}# Bitstream generation
+
+{% if hooks %}{{ hooks.prebit | join('\n') }}{% endif %}
+
+process run "Generate Programming File"
+if { [process get "Generate Programming File" status] == "errors" } { exit 1 }
+catch { file copy -force {{ top }}.bit {{ project }}.bit }
+
+{% if hooks %}{{ hooks.postbit | join('\n') }}{% endif %}
+
+{% endif %}
+
+project close
+
+{% endif %}

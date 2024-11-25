@@ -1,0 +1,62 @@
+{#
+#
+# Copyright (C) 2015-2024 PyFPGA Project
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+#}
+
+cleancablelock
+
+{# ------------------------------------------------------------------------- #}
+
+{% if fpga %}
+setMode -bs
+setCable -port auto
+Identify -inferir
+assignFile -p {{ position }} -file  {{ bitstream }}
+Program -p {{ position }}
+{% endif %}
+
+{# ------------------------------------------------------------------------- #}
+
+{% if spi %}
+setMode -pff
+addConfigDevice -name {{ name }} -path .
+setSubmode -pffspi
+addDesign -version 0 -name 0
+addDeviceChain -index 0
+addDevice -p 1 -file {{ bitstream }}
+generate -generic
+
+setMode -bs
+setCable -port auto
+Identify
+attachflash -position {{ position }} -spi {{ name }}
+assignfiletoattachedflash -position {{ position }} -file ./{{ name }}.mcs
+Program -p {{ position }} -dataWidth {{ width }} -spionly -e -v -loadfpga
+{% endif %}
+
+{# ------------------------------------------------------------------------- #}
+
+{% if bpi %}
+setMode -pff
+addConfigDevice -name {{ name }} -path .
+setSubmode -pffbpi
+addDesign -version 0 -name 0
+addDeviceChain -index 0
+setAttribute -configdevice -attr flashDataWidth -value {{ width }}
+addDevice -p 1 -file {{ bitstream }}
+generate -generic
+
+setMode -bs
+setCable -port auto
+Identify
+attachflash -position {{ position }} -bpi {{ name }}
+assignfiletoattachedflash -position {{ position }} -file ./{{ name }}.mcs
+Program -p {{ position }} -dataWidth {{ width }} -rs1 NONE -rs0 NONE -bpionly -e -v -loadfpga
+{% endif %}
+
+{# ------------------------------------------------------------------------- #}
+
+quit

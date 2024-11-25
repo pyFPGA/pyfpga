@@ -1,6 +1,0 @@
-# Xilinx Constraint File
-#
-# Used during the synthesis (XST) to specify timing and synthesis constraints.
-
-NET "clk_i" TNM_NET = "clk_i";
-TIMESPEC "TS_clk_i" = PERIOD "clk_i" 20.00 ns HIGH 50%;

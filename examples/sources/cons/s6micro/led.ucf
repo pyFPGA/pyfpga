@@ -1,0 +1,1 @@
+NET "led_o" LOC = "C2";

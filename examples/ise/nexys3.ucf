@@ -1,7 +1,0 @@
-# User Constraints File
-#
-# Used during the implementation to specify timing, placement and pinout
-# constraints.
-
-NET "clk_i" LOC = "V10";
-NET "led_o" LOC = "U16";
